@@ -1,19 +1,5 @@
 {
-  "name": "speedtestjs",
-  "pages_build_output_dir": "out" 
-},
-{
-  "name": "ping",
-  "compatibility_date": "2025-05-31",
-  "main": "functions/ping.js"
-},
-{
-  "name": "download",
-  "compatibility_date": "2025-05-31",
-  "main": "functions/download.js"
-},
-{
-  "name": "upload",
-  "compatibility_date": "2025-05-31",
-  "main": "functions/upload.js"
+  "name": "nextjs-cloudflare-speedtest,
+  "pages_build_output_dir": "out",
+  "compatibility_date": "2024-05-30",
 }
