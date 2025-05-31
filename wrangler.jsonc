@@ -1,5 +1,5 @@
 {
-  "name": "nextjs-cloudflare-speedtest,
-  "pages_build_output_dir": "out",
-  "compatibility_date": "2024-05-30"
+  "name": "nextjs-cloudflare-speedtest",
+  "compatibility_date": "2024-05-30",
+  "pages_build_output_dir": "out"
 }
