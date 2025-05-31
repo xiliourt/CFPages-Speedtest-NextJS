@@ -1,56 +1,55 @@
-// File: functions/api/download.js
-// Streams a configurable amount of data for download speed testing.
-// Accessed via /api/download
+// Function to generate a chunk of random data as Uint8Array
+function generateRandomChunk(size) {
+  const buffer = new Uint8Array(size);
+  for (let i = 0; i < size; i++) {
+    buffer[i] = Math.floor(Math.random() * 256);
+  }
+  return buffer;
+}
 
-export async function onRequestGet(context) {
-  const { request } = context;
+export default async function handler(req) {
+  // In the Edge Runtime, req is a standard Request object.
+  // We need to parse query parameters from the URL.
+  const url = new URL(req.url);
+  const requestedSize = parseInt(url.searchParams.get('size')) || (10 * 1024 * 1024); // Default to 10MB
+  const chunkSize = 64 * 1024; // 64KB chunks
 
-  const fileSize = 10 * 1024 * 1024; // 10 MB - MUST match frontend
-  let bytesSent = 0;
-  const chunkSize = 64 * 1024;
-
-  const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+  const headers = {
+    'Content-Type': 'application/octet-stream',
+    'Content-Disposition': 'attachment; filename="download.dat"',
+    'Content-Length': requestedSize.toString(),
+    'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+    'Pragma': 'no-cache',
+    'Expires': '0',
+    'Surrogate-Control': 'no-store',
   };
 
-  const readableStream = new ReadableStream({
-    pull(controller) {
-      if (bytesSent >= fileSize) {
+  let bytesSent = 0;
+
+  const stream = new ReadableStream({
+    async pull(controller) {
+      if (bytesSent >= requestedSize) {
         controller.close();
         return;
       }
-      const bytesToSend = Math.min(chunkSize, fileSize - bytesSent);
-      const chunk = new Uint8Array(bytesToSend);
-      for (let i = 0; i < bytesToSend; i++) {
-        chunk[i] = 97; // 'a'
+
+      const bytesRemaining = requestedSize - bytesSent;
+      const currentChunkSize = Math.min(chunkSize, bytesRemaining);
+      
+      try {
+        const chunk = generateRandomChunk(currentChunkSize);
+        controller.enqueue(chunk);
+        bytesSent += currentChunkSize;
+      } catch (error) {
+        console.error("Error generating or enqueuing chunk:", error);
+        controller.error(error); // Signal an error to the stream
       }
-      controller.enqueue(chunk);
-      bytesSent += bytesToSend;
     },
     cancel(reason) {
-      console.log('Download stream cancelled:', reason);
+      console.log('Download stream cancelled by client.', reason);
+      // Perform any cleanup here if necessary
     }
   });
 
-  return new Response(readableStream, {
-    status: 200,
-    headers: {
-      ...corsHeaders,
-      'Content-Type': 'application/octet-stream',
-      'Content-Length': fileSize.toString(),
-      'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
-      'Pragma': 'no-cache',
-    },
-  });
-}
-
-export async function onRequestOptions(context) {
-    const corsHeaders = {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-    };
-    return new Response(null, { headers: corsHeaders });
+  return new Response(stream, { headers });
 }
