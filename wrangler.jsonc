@@ -1,21 +1,19 @@
 {
-  // Name of your project, can be derived from package.json.
-  // This is used by Wrangler for identifying the project.
   "name": "speedtestjs",
-  {
-    "name": "ping",
-    "compatibility_date": "2025-05-31",
-    "main": "functions/ping.js"
-  },
-  {
-    "name": "download",
-    "compatibility_date": "2025-05-31",
-    "main": "functions/download.js"
-  },
-  {
-    "name": "upload",
-    "compatibility_date": "2025-05-31",
-    "main": "functions/upload.js"
-  }
   "pages_build_output_dir": "out" 
+},
+{
+  "name": "ping",
+  "compatibility_date": "2025-05-31",
+  "main": "functions/ping.js"
+},
+{
+  "name": "download",
+  "compatibility_date": "2025-05-31",
+  "main": "functions/download.js"
+},
+{
+  "name": "upload",
+  "compatibility_date": "2025-05-31",
+  "main": "functions/upload.js"
 }
