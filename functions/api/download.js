@@ -11,7 +11,7 @@ export async function onRequestGet(context) {
   // Default size if no 'size' parameter is provided or if it's invalid
   const DEFAULT_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
   const MIN_FILE_SIZE_BYTES = 1 * 1024; // 1 KB
-  const MAX_FILE_SIZE_BYTES = 250 * 1024 * 1024; // 50 MB (Adjust as needed for your limits)
+  const MAX_FILE_SIZE_BYTES = 1000 * 1024 * 1024; // 50 MB (Adjust as needed for your limits)
 
   let fileSize = DEFAULT_FILE_SIZE_BYTES;
 
