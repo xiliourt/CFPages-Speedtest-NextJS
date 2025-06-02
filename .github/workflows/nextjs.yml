@@ -49,6 +49,7 @@ jobs:
             echo "Unable to determine package manager"
             exit 1
           fi
+          npm i --package-lock-only
 
       - name: Setup Node
         uses: actions/setup-node@v4
