@@ -44,12 +44,13 @@ jobs:
             echo "manager=npm" >> $GITHUB_OUTPUT
             echo "command=ci" >> $GITHUB_OUTPUT
             echo "runner=npx --no-install" >> $GITHUB_OUTPUT
+            npm i --package-lock-only
             exit 0
           else
             echo "Unable to determine package manager"
             exit 1
           fi
-          npm i --package-lock-only
+          
 
       - name: Setup Node
         uses: actions/setup-node@v4
