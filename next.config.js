@@ -1,8 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Uncomment the following line to build a static site.
+  // output: "export",
+
   reactStrictMode: true,
-  // Enable static HTML export
-  output: 'export',
 };
 
-module.exports = nextConfig;
+export default nextConfig;
