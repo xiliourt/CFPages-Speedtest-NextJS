@@ -11,18 +11,24 @@ export async function onRequestGet(context) {
   // Default size if no 'size' parameter is provided or if it's invalid
   const DEFAULT_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
   const MIN_FILE_SIZE_BYTES = 1 * 1024; // 1 KB
-  const MAX_FILE_SIZE_BYTES = 1000 * 1024 * 1024; // 50 MB (Adjust as needed for your limits)
+  // Increased max size for flexibility
+  const MAX_FILE_SIZE_BYTES = 250 * 1024 * 1024; // 500 MB (Adjust as needed for your limits)
 
   let fileSize = DEFAULT_FILE_SIZE_BYTES;
 
+  /**
+   * Generates a chunk of random data using the Web Crypto API.
+   * @param {number} size - The size of the chunk to generate in bytes.
+   * @returns {Uint8Array} A buffer filled with random data.
+   */
   function generateRandomChunk(size) {
-  // Create a buffer of the specified size.
-  const buffer = new Uint8Array(size);
-  // Use the Web Crypto API to fill the buffer with random values.
-  // This is a single, fast operation.
-  crypto.getRandomValues(buffer);
-  return buffer;
-}
+    // Create a buffer of the specified size.
+    const buffer = new Uint8Array(size);
+    // Use the Web Crypto API to fill the buffer with random values.
+    // This is a single, fast operation.
+    crypto.getRandomValues(buffer);
+    return buffer;
+  }
 
   if (requestedSize) {
     const parsedSize = parseInt(requestedSize, 10);
@@ -38,7 +44,11 @@ export async function onRequestGet(context) {
   // --- End Configuration ---
 
   let bytesSent = 0;
-  const chunkSize = 64 * 1024; // 64KB
+  // --- CHUNK SIZE INCREASED ---
+  // Increased from 64KB to 256KB. Larger chunks can improve throughput
+  // by reducing the overhead of processing each chunk, but may increase
+  // memory usage and latency on slower networks.
+  const chunkSize = 256 * 1024; // 256KB
 
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*', // Or specify your frontend domain
@@ -46,16 +56,18 @@ export async function onRequestGet(context) {
     'Access-Control-Allow-Headers': 'Content-Type',
   };
 
- const stream = new ReadableStream({
+  const stream = new ReadableStream({
     async pull(controller) {
-      if (bytesSent >= requestedSize) {
+      // CORRECTED: Use the validated `fileSize` instead of the raw `requestedSize`.
+      if (bytesSent >= fileSize) {
         controller.close();
         return;
       }
 
-      const bytesRemaining = requestedSize - bytesSent;
+      // CORRECTED: Calculate remaining bytes based on `fileSize`.
+      const bytesRemaining = fileSize - bytesSent;
       const currentChunkSize = Math.min(chunkSize, bytesRemaining);
-      
+
       try {
         const chunk = generateRandomChunk(currentChunkSize);
         controller.enqueue(chunk);
@@ -71,10 +83,8 @@ export async function onRequestGet(context) {
     }
   });
 
-  return new Response(stream, { headers });
-}
-
-  return new Response(readableStream, {
+  // CORRECTED: Consolidated into a single, valid Response object.
+  return new Response(stream, {
     status: 200,
     headers: {
       ...corsHeaders,
@@ -87,10 +97,13 @@ export async function onRequestGet(context) {
 }
 
 export async function onRequestOptions(context) {
-    const corsHeaders = {
-      'Access-Control-Allow-Origin': '*', // Or specify your frontend domain
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-    };
-    return new Response(null, { headers: corsHeaders });
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*', // Or specify your frontend domain
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Range', // Added Range for potential future use
+  };
+  return new Response(null, {
+    status: 204, // No Content
+    headers: corsHeaders
+  });
 }
