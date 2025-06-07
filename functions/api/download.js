@@ -48,7 +48,7 @@ export async function onRequestGet(context) {
   // Increased from 64KB to 256KB. Larger chunks can improve throughput
   // by reducing the overhead of processing each chunk, but may increase
   // memory usage and latency on slower networks.
-  const chunkSize = 256 * 1024; // 256KB
+  const chunkSize = 64 * 1024; // 256KB
 
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*', // Or specify your frontend domain
