@@ -15,6 +15,15 @@ export async function onRequestGet(context) {
 
   let fileSize = DEFAULT_FILE_SIZE_BYTES;
 
+  function generateRandomChunk(size) {
+  // Create a buffer of the specified size.
+  const buffer = new Uint8Array(size);
+  // Use the Web Crypto API to fill the buffer with random values.
+  // This is a single, fast operation.
+  crypto.getRandomValues(buffer);
+  return buffer;
+}
+
   if (requestedSize) {
     const parsedSize = parseInt(requestedSize, 10);
     if (!isNaN(parsedSize) && parsedSize >= MIN_FILE_SIZE_BYTES && parsedSize <= MAX_FILE_SIZE_BYTES) {
@@ -37,25 +46,33 @@ export async function onRequestGet(context) {
     'Access-Control-Allow-Headers': 'Content-Type',
   };
 
-  const readableStream = new ReadableStream({
-    pull(controller) {
-      if (bytesSent >= fileSize) {
+ const stream = new ReadableStream({
+    async pull(controller) {
+      if (bytesSent >= requestedSize) {
         controller.close();
         return;
       }
-      const bytesToSend = Math.min(chunkSize, fileSize - bytesSent);
-      const chunk = new Uint8Array(bytesToSend);
-      // Fill the chunk with some dummy data (e.g., character 'a')
-      for (let i = 0; i < bytesToSend; i++) {
-        chunk[i] = 97; // ASCII for 'a'
+
+      const bytesRemaining = requestedSize - bytesSent;
+      const currentChunkSize = Math.min(chunkSize, bytesRemaining);
+      
+      try {
+        const chunk = generateRandomChunk(currentChunkSize);
+        controller.enqueue(chunk);
+        bytesSent += currentChunkSize;
+      } catch (error) {
+        console.error("Error generating or enqueuing chunk:", error);
+        controller.error(error); // Signal an error to the stream
       }
-      controller.enqueue(chunk);
-      bytesSent += bytesToSend;
     },
     cancel(reason) {
-      console.log('Download stream cancelled:', reason);
+      console.log('Download stream cancelled by client.', reason);
+      // Perform any cleanup here if necessary
     }
   });
+
+  return new Response(stream, { headers });
+}
 
   return new Response(readableStream, {
     status: 200,
