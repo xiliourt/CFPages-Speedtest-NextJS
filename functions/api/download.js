@@ -19,7 +19,7 @@ export async function onRequestGet(context) {
   // The size of each data chunk to be generated and sent.
   // A larger chunk size can reduce CPU overhead and potentially increase throughput,
   // but also increases memory usage per request during chunk generation.
-  const CHUNK_SIZE_BYTES = 4 * 1024 * 1024; // 4 MB
+  const CHUNK_SIZE_BYTES = 64 * 1024; // 4 MB
 
   // Default size if no 'size' parameter is provided or if it's invalid.
   const DEFAULT_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
