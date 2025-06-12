@@ -1,30 +1,67 @@
+import { useState, useEffect, useRef } from 'react';
 import Head from 'next/head';
-import { useState, useEffect } from 'react';
 
-// Configuration
+// --- SERVER CONFIGURATION ---
+const SERVERS = [
+    {
+        name: 'AWS',
+        pingUrl: 'https://js.aws.dyl.ovh/api/ping',
+        downloadUrl: 'https://js.aws.dyl.ovh/api/download',
+        uploadUrl: 'https://vha7zsy647pevemjz7qise7t3m0zvzvm.lambda-url.us-east-1.on.aws/'
+    },
+    {
+        name: 'Vercel',
+        pingUrl: 'https://speedtestjs.vercel.app/api/ping',
+        downloadUrl: 'https://speedtestjs.vercel.app/api/download',
+        uploadUrl: 'https://speedtestjs.vercel.app/api/upload'
+    },
+    {
+        name: 'Render',
+        pingUrl: 'https://js.render.dyl.ovh/api/ping',
+        downloadUrl: 'https://js.render.dyl.ovh/api/download',
+        uploadUrl: 'https://js.render.dyl.ovh/api/upload'
+    },
+    {
+        name: 'Netlify',
+        pingUrl: 'https://js.netlify.dyl.ovh/api/ping',
+        downloadUrl: 'https://js.netlify.dyl.ovh/api/download',
+        uploadUrl: 'https://js.netlify.dyl.ovh/api/upload'
+    },
+    {
+        name: 'Cloudflare Pages',
+        pingUrl: 'https://js.cf.dyl.ovh/api/ping',
+        downloadUrl: 'https://js.cf.dyl.ovh/api/download',
+        uploadUrl: 'https://js.cf.dyl.ovh/api/upload'
+    },
+    {
+        name: 'Sydney Server',
+        pingUrl: 'https://js.syd.dyl.ovh/api/ping',
+        downloadUrl: 'https://js.syd.dyl.ovh/api/download',
+        uploadUrl: 'https://js.syd.dyl.ovh/api/upload'
+    }
+];
+
+// --- TEST CONFIGURATION ---
 const PING_COUNT = 5;
-const INITIAL_DOWNLOAD_SIZE_BYTES = 10 * 1024 * 1024; // 10MB for the initial test
+const INITIAL_DOWNLOAD_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
 const EXTENDED_DOWNLOAD_SIZE_MEDIUM_BYTES = 50 * 1024 * 1024; // 50MB
-const EXTENDED_DOWNLOAD_SIZE_LARGE_BYTES = 250 * 1024 * 1024; // 100MB
+const EXTENDED_DOWNLOAD_SIZE_LARGE_BYTES = 100 * 1024 * 1024; // 100MB
+const SPEED_THRESHOLD_FOR_MEDIUM_EXTENDED_MBPS = 50;
+const SPEED_THRESHOLD_FOR_LARGE_EXTENDED_MBPS = 125;
+const UPLOAD_DATA_SIZE_BYTES = 4 * 1024 * 1024; // 4MB
 
-// Thresholds for triggering extended tests (in Mbps)
-const SPEED_THRESHOLD_FOR_MEDIUM_EXTENDED_MBPS = 25;
-const SPEED_THRESHOLD_FOR_LARGE_EXTENDED_MBPS = 100;
-
-const UPLOAD_API_URL = '/api/upload';
-const UPLOAD_DATA_SIZE_BYTES = 4 * 1024 * 1024; // 5MB
-const PING_API_URL = '/api/ping';
-const DOWNLOAD_API_URL = '/api/download'; // Base URL, size will be a query param
-
-export default function SpeedTestPage() {
+export default function InternetSpeedTest() {
     const [ping, setPing] = useState('--');
     const [downloadSpeed, setDownloadSpeed] = useState('--');
     const [uploadSpeed, setUploadSpeed] = useState('--');
-    const [status, setStatus] = useState('Click "Start Test" to begin.');
+    const [status, setStatus] = useState('Select a server and click "Start Test".');
     const [progress, setProgress] = useState(0);
     const [isTesting, setIsTesting] = useState(false);
     const [showProgress, setShowProgress] = useState(false);
     const [currentTest, setCurrentTest] = useState('');
+    const [selectedServerIndex, setSelectedServerIndex] = useState(0);
+
+    const serverSelectEl = useRef(null);
 
     const resetMetrics = () => {
         setPing('--');
@@ -36,7 +73,7 @@ export default function SpeedTestPage() {
         setCurrentTest('');
     };
 
-    const measurePing = async () => {
+    const measurePing = async (pingUrl) => {
         setCurrentTest('Ping');
         setStatus('Testing Ping...');
         setPing('...');
@@ -49,7 +86,7 @@ export default function SpeedTestPage() {
         for (let i = 0; i < PING_COUNT; i++) {
             const startTime = performance.now();
             try {
-                await fetch(`${PING_API_URL}?r=${Math.random()}&t=${Date.now()}`, { method: 'GET', cache: 'no-store' });
+                await fetch(`${pingUrl}?r=${Math.random()}&t=${Date.now()}`, { method: 'GET', cache: 'no-store' });
                 const endTime = performance.now();
                 pings.push(endTime - startTime);
             } catch (error) {
@@ -61,7 +98,7 @@ export default function SpeedTestPage() {
                 await new Promise(resolve => setTimeout(resolve, 200));
             }
         }
-        
+
         const validPings = pings.filter(p => p !== null);
         if (validPings.length > 0) {
             const avgPing = validPings.reduce((a, b) => a + b, 0) / validPings.length;
@@ -74,11 +111,9 @@ export default function SpeedTestPage() {
         setProgress(100);
     };
 
-    // Generic download measurement function
-    const performDownloadTest = async (downloadSizeBytes, testLabel) => {
+    const performDownloadTest = async (downloadUrl, downloadSizeBytes, testLabel) => {
         setCurrentTest(testLabel);
         setStatus(`Testing ${testLabel}...`);
-        // setDownloadSpeed('...'); // Keep previous result visible during extended test setup
         setShowProgress(true);
         setProgress(0);
 
@@ -86,122 +121,114 @@ export default function SpeedTestPage() {
         let measuredSpeed = '--';
 
         try {
-            const response = await fetch(`${DOWNLOAD_API_URL}?size=${downloadSizeBytes}&r=${Math.random()}&t=${Date.now()}`, { cache: 'no-store' });
+            const response = await fetch(`${downloadUrl}?size=${downloadSizeBytes}&r=${Math.random()}&t=${Date.now()}`, { cache: 'no-store' });
             if (!response.ok || !response.body) {
                 throw new Error(`Server error for ${testLabel}: ${response.status} ${response.statusText}`);
             }
-            
+
             const reader = response.body.getReader();
             let receivedLength = 0;
-            
-            while(true) {
-                const {done, value} = await reader.read();
+
+            while (true) {
+                const { done, value } = await reader.read();
                 if (done) break;
                 receivedLength += value.length;
-                const progressPercentage = Math.min(100, (receivedLength / downloadSizeBytes) * 100);
-                setProgress(progressPercentage);
+                setProgress(Math.min(100, (receivedLength / downloadSizeBytes) * 100));
             }
 
             const endTime = performance.now();
             const durationSeconds = (endTime - startTime) / 1000;
-            
+
             if (durationSeconds <= 0 || receivedLength === 0) {
-                 measuredSpeed = 'ERR';
-                 throw new Error(`${testLabel} failed (zero duration or size)`);
+                measuredSpeed = 'ERR';
+                throw new Error(`${testLabel} failed (zero duration or size)`);
             }
 
-            const speedBps = (receivedLength * 8) / durationSeconds; 
+            const speedBps = (receivedLength * 8) / durationSeconds;
             measuredSpeed = (speedBps / (1000 * 1000)).toFixed(2);
             setProgress(100);
             return measuredSpeed;
 
         } catch (error) {
             console.error(`${testLabel} failed:`, error);
-            measuredSpeed = 'ERR';
+            setDownloadSpeed('ERR');
             setProgress(0);
             setStatus(`Error: ${error.message}`);
-            throw error; // Re-throw to be caught by startTest
+            throw error;
         }
     };
 
-
-    const measureUpload = async () => {
+    const measureUpload = async (uploadUrl) => {
         setCurrentTest('Upload');
         setStatus('Testing Upload...');
         setUploadSpeed('...');
         setShowProgress(true);
         setProgress(0);
 
-        return new Promise((resolve, reject) => {
-            const data = new Uint8Array(UPLOAD_DATA_SIZE_BYTES);
+        try {
+            const randomData = new Uint8Array(UPLOAD_DATA_SIZE_BYTES);
             for (let i = 0; i < UPLOAD_DATA_SIZE_BYTES; i++) {
-                data[i] = Math.floor(Math.random() * 256);
+                randomData[i] = Math.floor(Math.random() * 256);
             }
-            const blob = new Blob([data]);
+            const payload = new Blob([randomData], { type: 'application/octet-stream' });
 
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST', `${UPLOAD_API_URL}?r=${Math.random()}&t=${Date.now()}`, true);
-            
-            const startTime = performance.now();
+            const startTime = Date.now();
+            const response = await fetch(uploadUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/octet-stream'
+                },
+                body: payload,
+            });
 
-            xhr.upload.onprogress = (event) => {
-                if (event.lengthComputable) {
-                    const percentage = Math.min(100, (event.loaded / event.total) * 100);
-                    setProgress(percentage);
-                }
-            };
-            
-            xhr.onload = () => {
-                if (xhr.status >= 200 && xhr.status < 300) {
-                    const endTime = performance.now();
-                    const durationSeconds = (endTime - startTime) / 1000;
-                    if (durationSeconds <= 0) {
-                        setUploadSpeed('ERR');
-                        setStatus('Error: Upload test failed.');
-                        reject(new Error('Upload test failed (zero duration)'));
-                        return;
-                    }
-                    const speedBps = (UPLOAD_DATA_SIZE_BYTES * 8) / durationSeconds;
-                    const speedMbps = (speedBps / (1000 * 1000)).toFixed(2);
-                    setUploadSpeed(speedMbps);
-                    setProgress(100);
-                    resolve();
-                } else {
-                    setUploadSpeed('ERR');
-                    console.error('Upload failed with status:', xhr.status, xhr.statusText, xhr.responseText);
-                    setStatus(`Error: Upload failed - ${xhr.statusText || 'Server error'}`);
-                    reject(new Error(`Upload failed: ${xhr.statusText || 'Server error'} - ${xhr.responseText}`));
-                }
-            };
+            const duration = (Date.now() - startTime) / 1000;
 
-            xhr.onerror = () => {
-                setUploadSpeed('ERR');
-                console.error('Upload network error');
-                setProgress(0);
-                setStatus('Error: Upload network error.');
-                reject(new Error('Upload network error'));
-            };
-            
-            xhr.send(blob);
-        });
+            if (!response.ok) {
+                throw new Error(`Server responded with status: ${response.status}`);
+            }
+
+            if (duration <= 0) {
+                throw new Error('Upload test failed (zero duration).');
+            }
+
+            const speedBps = (UPLOAD_DATA_SIZE_BYTES * 8) / duration;
+            const speedMbps = (speedBps / (1000 * 1000)).toFixed(2);
+
+            setUploadSpeed(speedMbps);
+            setProgress(100);
+
+        } catch (error) {
+            console.error('Upload test failed:', error);
+            setUploadSpeed('ERR');
+            setStatus(`Error: ${error.message}`);
+            setProgress(0);
+            throw error;
+        }
     };
 
     const startTest = async () => {
         if (isTesting) return;
+
+        const selectedServer = SERVERS[selectedServerIndex];
+        if (!selectedServer) {
+            setStatus('Error: Please select a valid server.');
+            return;
+        }
+
         setIsTesting(true);
         resetMetrics();
-        setStatus('Initializing test...');
+        setStatus(`Initializing test with ${selectedServer.name}...`);
 
         let finalDownloadSpeed = '--';
 
         try {
-            await measurePing();
+            await measurePing(selectedServer.pingUrl);
             await new Promise(resolve => setTimeout(resolve, 300));
 
-            // Initial Download Test (10MB)
-            const initialSpeed = await performDownloadTest(INITIAL_DOWNLOAD_SIZE_BYTES, 'Initial Download (10MB)');
-            setDownloadSpeed(initialSpeed); // Display initial speed
+            const initialSpeed = await performDownloadTest(selectedServer.downloadUrl, INITIAL_DOWNLOAD_SIZE_BYTES, 'Download (10MB)');
+            setDownloadSpeed(initialSpeed);
             finalDownloadSpeed = initialSpeed;
+
 
             let targetExtendedSize = 0;
             if (initialSpeed !== 'ERR') {
@@ -215,31 +242,25 @@ export default function SpeedTestPage() {
 
             if (targetExtendedSize > 0) {
                 await new Promise(resolve => setTimeout(resolve, 300));
-                const extendedTestLabel = `Extended Download (${targetExtendedSize / (1024*1024)}MB)`;
-                const extendedSpeed = await performDownloadTest(targetExtendedSize, extendedTestLabel);
-                setDownloadSpeed(extendedSpeed); // Update with extended speed
+                const extendedTestLabel = `Download (${targetExtendedSize / (1024 * 1024)}MB)`;
+                const extendedSpeed = await performDownloadTest(selectedServer.downloadUrl, targetExtendedSize, extendedTestLabel);
+                setDownloadSpeed(extendedSpeed);
                 finalDownloadSpeed = extendedSpeed;
             }
-            
-            // Update status after download phase is fully complete
+
             if (finalDownloadSpeed !== 'ERR') {
                 setStatus('Download test complete.');
-            } else {
-                // Error status would have been set by performDownloadTest
             }
 
-
             await new Promise(resolve => setTimeout(resolve, 300));
-            await measureUpload();
+            await measureUpload(selectedServer.uploadUrl);
 
             setStatus('Test Complete!');
             setCurrentTest('Complete');
-
         } catch (error) {
             console.error("Speed test sequence failed: ", error);
-            // Error status should be set by individual test functions
             if (!status.startsWith('Error:')) {
-                 setStatus(`Error: ${error.message}. Please try again.`);
+                setStatus(`Error: ${error.message}. Please try again.`);
             }
             setCurrentTest('Error');
         } finally {
@@ -247,60 +268,63 @@ export default function SpeedTestPage() {
         }
     };
 
-    const getProgressBarColor = () => {
-        if (currentTest === 'Error') return 'bg-red-500';
-        if (currentTest === 'Complete') return 'bg-green-500';
-        return 'bg-sky-500';
-    };
-
     return (
         <>
             <Head>
-                <title>Sleek Speed Test - Next.js</title>
+                <title>Internet Speed Test</title>
                 <meta name="description" content="Measure your internet speed with Next.js and Tailwind CSS" />
-                {/* Favicon link is in _app.js for global availability, or you can place specific one here */}
             </Head>
-
-            <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white flex items-center justify-center min-h-screen p-4 selection:bg-sky-500 selection:text-white">
+            <div className="text-white flex items-center justify-center min-h-screen p-4">
                 <div className="bg-slate-800 p-6 sm:p-10 rounded-xl shadow-2xl w-full max-w-lg border border-slate-700">
-                    <header className="text-center mb-8 sm:mb-10">
+                    <header className="text-center mb-6">
                         <h1 className="text-3xl sm:text-4xl font-bold text-sky-400">Internet Speed Test</h1>
-                        <p className="text-slate-400 mt-2 text-sm sm:text-base">Measure your connection to this server.</p>
+                        <p className="text-slate-400 mt-2 text-sm sm:text-base">Measure your connection speed.</p>
                     </header>
+
+                    <div className="mb-8">
+                        <label htmlFor="server-select" className="block mb-2 text-sm font-medium text-slate-400">Select Server</label>
+                        <select
+                            id="server-select"
+                            ref={serverSelectEl}
+                            onChange={(e) => setSelectedServerIndex(e.target.value)}
+                            disabled={isTesting}
+                            className="bg-slate-700 border border-slate-600 text-white text-sm rounded-lg focus:ring-sky-500 focus:border-sky-500 block w-full p-2.5 transition duration-150 ease-in-out disabled:opacity-50"
+                        >
+                            {SERVERS.map((server, index) => (
+                                <option key={index} value={index}>{server.name}</option>
+                            ))}
+                        </select>
+                    </div>
 
                     <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-8 sm:mb-10 text-center">
                         <div>
                             <p className="text-xs sm:text-sm text-slate-400 uppercase tracking-wider">Ping</p>
-                            <p id="ping-value" className={`text-2xl sm:text-3xl font-bold ${ping === 'ERR' ? 'text-red-500' : 'text-sky-400'} transition-colors duration-300`}>{ping}</p>
+                            <p className={`text-2xl sm:text-3xl font-bold transition-colors duration-300 ${ping === 'ERR' ? 'text-red-500' : 'text-sky-400'}`}>{ping}</p>
                             <p className="text-xs text-slate-500">ms</p>
                         </div>
                         <div>
                             <p className="text-xs sm:text-sm text-slate-400 uppercase tracking-wider">Download</p>
-                            <p id="download-value" className={`text-2xl sm:text-3xl font-bold ${downloadSpeed === 'ERR' ? 'text-red-500' : 'text-sky-400'} transition-colors duration-300`}>{downloadSpeed}</p>
+                            <p className={`text-2xl sm:text-3xl font-bold transition-colors duration-300 ${downloadSpeed === 'ERR' ? 'text-red-500' : 'text-sky-400'}`}>{downloadSpeed}</p>
                             <p className="text-xs text-slate-500">Mbps</p>
                         </div>
                         <div>
                             <p className="text-xs sm:text-sm text-slate-400 uppercase tracking-wider">Upload</p>
-                            <p id="upload-value" className={`text-2xl sm:text-3xl font-bold ${uploadSpeed === 'ERR' ? 'text-red-500' : 'text-sky-400'} transition-colors duration-300`}>{uploadSpeed}</p>
+                            <p className={`text-2xl sm:text-3xl font-bold transition-colors duration-300 ${uploadSpeed === 'ERR' ? 'text-red-500' : 'text-sky-400'}`}>{uploadSpeed}</p>
                             <p className="text-xs text-slate-500">Mbps</p>
                         </div>
                     </div>
 
                     <div className="mb-8 sm:mb-10 h-10 sm:h-12 flex flex-col justify-end">
-                        {showProgress && (
-                            <div id="progress-bar-container" className="w-full bg-slate-700 rounded-full h-2.5 mb-2 overflow-hidden">
-                                <div 
-                                    id="progress-bar" 
-                                    className={`${getProgressBarColor()} h-2.5 rounded-full transition-all duration-300 ease-out`}
-                                    style={{ width: `${progress}%` }}
-                                ></div>
-                            </div>
-                        )}
-                        <p id="status-text" className={`text-center ${status.startsWith('Error:') ? 'text-red-400' : 'text-sky-400'} text-sm h-5 transition-colors duration-300`}>{status}</p>
+                        <div className={`w-full bg-slate-700 rounded-full h-2.5 mb-2 overflow-hidden ${showProgress ? 'block' : 'hidden'}`}>
+                            <div
+                                className={`h-2.5 rounded-full transition-all duration-300 ease-out ${currentTest === 'Error' ? 'bg-red-500' : currentTest === 'Complete' ? 'bg-green-500' : 'bg-sky-500'}`}
+                                style={{ width: `${progress}%` }}
+                            ></div>
+                        </div>
+                        <p className={`text-center text-sm h-5 transition-colors duration-300 ${status.startsWith('Error:') ? 'text-red-400' : 'text-sky-400'}`}>{status}</p>
                     </div>
-                    
-                    <button 
-                        id="start-button" 
+
+                    <button
                         onClick={startTest}
                         disabled={isTesting}
                         className="w-full bg-sky-500 hover:bg-sky-600 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold py-3 px-4 rounded-lg transition-all duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-400 focus:ring-opacity-75 flex items-center justify-center transform hover:scale-102 active:scale-98"
