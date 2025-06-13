@@ -1,5 +1,12 @@
 {
-  "name": "nextjs-cloudflare-speedtest",
-  "compatibility_date": "2024-05-30",
-  "pages_build_output_dir": "out"
+  "main": ".open-next/worker.js",
+  "name": "my-app",
+  "compatibility_date": "2025-03-25",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  }
 }
