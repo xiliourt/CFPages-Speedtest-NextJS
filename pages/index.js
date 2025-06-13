@@ -26,22 +26,30 @@ const ExclamationTriangleIcon = () => (
     </svg>
 );
 
-
 // --- SERVER CONFIGURATION ---
 const SERVERS = [
-    { name: 'Vercel', pingUrl: 'https://speedtestjs.vercel.app/api/ping', downloadUrl: 'https://speedtestjs.vercel.app/api/download', uploadUrl: 'https://speedtestjs.vercel.app/api/upload' },
-    { name: 'Render', pingUrl: 'https://js.render.dyl.ovh/api/ping', downloadUrl: 'https://js.render.dyl.ovh/api/download', uploadUrl: 'https://js.render.dyl.ovh/api/upload' },
-    { name: 'Netlify', pingUrl: 'https://js.netlify.dyl.ovh/api/ping', downloadUrl: 'https://js.netlify.dyl.ovh/api/download', uploadUrl: 'https://js.netlify.dyl.ovh/api/upload' },
-    { name: 'Cloudflare', pingUrl: 'https://js.cf.dyl.ovh/api/ping', downloadUrl: 'https://js.cf.dyl.ovh/api/download', uploadUrl: 'https://js.cf.dyl.ovh/api/upload' },
-    { name: 'Sydney, AU (Onidel)', pingUrl: 'https://js.s.dyl.ovh/api/ping', downloadUrl: 'https://js.s.dyl.ovh/api/download', uploadUrl: 'https://js.s.dyl.ovh/api/upload' },
-     { name: 'Stockholm (Hosthatch)', pingUrl: 'https://js.sto.dyl.ovh/api/ping', downloadUrl: 'https://js.sto.dyl.ovh/api/download', uploadUrl: 'https://js.sto.dyl.ovh/api/upload' }
+    { name: 'Vercel', pingUrl: 'https://speedtestjs.vercel.app/api/ping', downloadUrl: 'https://speedtestjs.vercel.app/api/download', uploadUrl: 'https://speedtestjs.vercel.app/api/upload', maxUpload: '4194304'},
+    { name: 'Render', pingUrl: 'https://js.render.dyl.ovh/api/ping', downloadUrl: 'https://js.render.dyl.ovh/api/download', uploadUrl: 'https://js.render.dyl.ovh/api/upload', maxUpload: '107374182400'},
+    { name: 'Netlify', pingUrl: 'https://js.netlify.dyl.ovh/api/ping', downloadUrl: 'https://js.netlify.dyl.ovh/api/download', uploadUrl: 'https://js.netlify.dyl.ovh/api/upload', maxUpload: '4194304'},
+    { name: 'Cloudflare', pingUrl: 'https://js.cf.dyl.ovh/api/ping', downloadUrl: 'https://js.cf.dyl.ovh/api/download', uploadUrl: 'https://js.cf.dyl.ovh/api/upload', maxUpload: '107374182400' },
+    { name: 'Sydney, AU (Onidel)', pingUrl: 'https://js.s.dyl.ovh/api/ping', downloadUrl: 'https://js.s.dyl.ovh/api/download', uploadUrl: 'https://js.s.dyl.ovh/api/upload', maxUpload: '107374182400' },
+    { name: 'Sydney, AU (via CF)', pingUrl: 'https://jsscf.dyl.ovh/api/ping', downloadUrl: 'https://jsscf.dyl.ovh/api/download', uploadUrl: 'https://jsscf.dyl.ovh/api/upload', maxUpload: '107374182400' },
+    { name: 'Stockholm (Hosthatch)', pingUrl: 'https://js.sto.dyl.ovh/api/ping', downloadUrl: 'https://js.sto.dyl.ovh/api/download', uploadUrl: 'https://js.sto.dyl.ovh/api/upload', maxUpload: '107374182400' },
+    { name: 'Stockholm (via CF)', pingUrl: 'https://jsstocf.dyl.ovh/api/ping', downloadUrl: 'https://jsstocf.dyl.ovh/api/download', uploadUrl: 'https://jsstocf.dyl.ovh/api/upload', maxUpload: '107374182400' }
 ];
 
 // --- TEST CONFIGURATION ---
 const PING_COUNT = 4;
 const PING_TIMEOUT_MS = 2000;
-const DOWNLOAD_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
-const UPLOAD_DATA_SIZE_BYTES = 4 * 1024 * 1024; // 4MB
+// **UPDATED**: Added two download sizes and a threshold for switching between them.
+const INITIAL_DOWNLOAD_SIZE_BYTES = 10 * 1024 * 1024; // 50MB
+const LARGE_DOWNLOAD_SIZE_BYTES = 50 * 1024 * 1024; // 100MB
+const INITIAL_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024; // 50MB
+const LARGE_UPLOAD_SIZE_BYTES = 25 * 1024 * 1024; // 25MB
+const FAST_CONNECTION_THRESHOLD_MBPS = 25; // Speed threshold to trigger larger downloads
+const FAST_CONNECTION_THRESHOLD_UP_MBPS = 10; // Speed threshold to trigger larger downloads
+
+
 
 // --- Main App Component ---
 export default function App() {
@@ -62,7 +70,7 @@ export default function App() {
         })));
     }, []);
 
-    // --- Core Measurement Functions (Logically unchanged, formatting added) ---
+    // --- Core Measurement Functions ---
 
     const measurePing = async (pingUrl, onProgress) => {
         let pings = [];
@@ -94,23 +102,30 @@ export default function App() {
         }
     };
 
-    const measureDownload = async (downloadUrl, onProgress) => {
+    // **UPDATED**: The function now accepts `downloadSize` as a parameter.
+    const measureDownload = async (downloadUrl, downloadSize, onProgress) => {
         const startTime = performance.now();
         try {
-            const response = await fetch(`${downloadUrl}?size=${DOWNLOAD_SIZE_BYTES}&r=${Math.random()}&t=${Date.now()}`, { cache: 'no-store' });
+            // Use the passed `downloadSize` in the request URL.
+            const response = await fetch(`${downloadUrl}?size=${downloadSize}&r=${Math.random()}&t=${Date.now()}`, { cache: 'no-store' });
             if (!response.ok || !response.body) throw new Error(`Server error: ${response.status} ${response.statusText}`);
+            
             const reader = response.body.getReader();
             let receivedLength = 0;
+            
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
                 receivedLength += value.length;
-                onProgress((receivedLength / DOWNLOAD_SIZE_BYTES) * 100);
+                // Calculate progress based on the current `downloadSize`.
+                onProgress((receivedLength / downloadSize) * 100);
             }
+            
             onProgress(100);
             const endTime = performance.now();
             const durationSeconds = (endTime - startTime) / 1000;
             if (durationSeconds <= 0 || receivedLength === 0) throw new Error('Download failed (zero duration or size)');
+            
             const speedBps = (receivedLength * 8) / durationSeconds;
             return (speedBps / (1000 * 1000)).toFixed(2);
         } catch (error) {
@@ -120,20 +135,22 @@ export default function App() {
         }
     };
 
-    const measureUpload = (uploadUrl, onProgress) => {
+    const measureUpload = (uploadUrl, uploadsize, onProgress) => {
         return new Promise((resolve, reject) => {
             const xhr = new XMLHttpRequest();
             const startTime = performance.now();
-            xhr.open('POST', `${uploadUrl}?r=${Math.random()}&t=${Date.now()}`, true);
+            xhr.open('POST', `${uploadUrl}`, true);
             xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+            
             xhr.upload.onprogress = (event) => {
                 if (event.lengthComputable) onProgress((event.loaded / event.total) * 100);
             };
+            
             xhr.onload = () => {
                 if (xhr.status >= 200 && xhr.status < 300) {
                     const durationSeconds = (performance.now() - startTime) / 1000;
                     if (durationSeconds <= 0) return reject(new Error('Upload test failed (zero duration)'));
-                    const speedBps = (UPLOAD_DATA_SIZE_BYTES * 8) / durationSeconds;
+                    const speedBps = (uploadsize * 8) / durationSeconds;
                     onProgress(100);
                     resolve((speedBps / (1000 * 1000)).toFixed(2));
                 } else {
@@ -141,9 +158,11 @@ export default function App() {
                     reject(new Error(`Server responded with status: ${xhr.status}`));
                 }
             };
+            
             xhr.onerror = () => { onProgress(0); reject(new Error(`Upload failed due to a network error.`)); };
             xhr.onabort = () => { onProgress(0); reject(new Error('Upload test was aborted.')); };
-            const payload = new Blob([new Uint8Array(UPLOAD_DATA_SIZE_BYTES)], { type: 'application/octet-stream' });
+            
+            const payload = new Blob([new Uint8Array(uploadsize)], { type: 'application/octet-stream' });
             xhr.send(payload);
         });
     };
@@ -159,23 +178,65 @@ export default function App() {
         for (let i = 0; i < SERVERS.length; i++) {
             const server = SERVERS[i];
             setTestResults(prev => prev.map((r, index) => index === i ? { ...r, status: 'testing' } : r));
-            let finalPing = 'ERR', finalDownload = 'ERR', finalUpload = 'ERR';
+            let finalPing = 'ERR', finalDownload = 'ERR', finalUpload = 'ERR', finalUploadLarge = 0, finalDownloadLarge = 0;
 
             try {
+                // Ping
                 setStatusMessage(`Pinging ${server.name}...`);
-                finalPing = await measurePing(server.pingUrl, (p) => setCurrentTestProgress(p));
-                setTestResults(prev => prev.map((r, idx) => idx === i ? { ...r, ping: finalPing } : r));
+                try {
+                    finalPing = await measurePing(server.pingUrl, (p) => setCurrentTestProgress(p));
+                    setTestResults(prev => prev.map((r, idx) => idx === i ? { ...r, ping: finalPing } : r));
+                } catch (error) {
+                    setTestResults(prev => prev.map((r, idx) => idx === i ? { ...r, ping: 'error' } : r));
+                    console.error(`Ping test failed for ${server.name}:`, error);
+                    setTestResults(prev => prev.map((r, index) => index === i ? { ...r, status: 'error' } : r))
+                }
+                
                 await new Promise(res => setTimeout(res, 200));
 
-                setStatusMessage(`Downloading from ${server.name}...`);
-                finalDownload = await measureDownload(server.downloadUrl, (p) => setCurrentTestProgress(p));
-                setTestResults(prev => prev.map((r, idx) => idx === i ? { ...r, download: finalDownload } : r));
+                // Download Test
+                setStatusMessage(`Downloading ${INITIAL_DOWNLOAD_SIZE_BYTES / 1024 / 1024}MB from ${server.name}...`);
+                try {
+                    finalDownload = await measureDownload(server.downloadUrl, INITIAL_DOWNLOAD_SIZE_BYTES, (p) => setCurrentTestProgress(p));
+                    setTestResults(prev => prev.map((r, idx) => idx === i ? { ...r, download: finalDownload } : r));
+                    
+                    // If it's the first test and the speed is above the threshold, enable large downloads for subsequent tests.
+                    if (parseFloat(finalDownload) > FAST_CONNECTION_THRESHOLD_MBPS) {
+                        setStatusMessage(`Downloading ${LARGE_DOWNLOAD_SIZE_BYTES / 1024 / 1024}MB from ${server.name}...`);
+                        finalDownloadLarge = await measureDownload(server.downloadUrl, LARGE_DOWNLOAD_SIZE_BYTES, (p) => setCurrentTestProgress(p));
+                        if (finalDownloadLarge > finalDownload) {
+                            setTestResults(prev => prev.map((r, idx) => idx === i ? { ...r, download: finalDownloadLarge } : r));
+                        }
+                    }
+                } catch(error) {
+                    console.error(`Download test failed for ${server.name}:`, error);
+                    setTestResults(prev => prev.map((r, idx) => idx === i ? { ...r, download: 'error' } : r));
+                    setTestResults(prev => prev.map((r, index) => index === i ? { ...r, status: 'error' } : r))
+                }
+                
                 await new Promise(res => setTimeout(res, 200));
 
-                setStatusMessage(`Uploading to ${server.name}...`);
-                finalUpload = await measureUpload(server.uploadUrl, (p) => setCurrentTestProgress(p));
-                setTestResults(prev => prev.map((r, idx) => idx === i ? { ...r, upload: finalUpload } : r));
-                setTestResults(prev => prev.map((r, index) => index === i ? { ...r, status: 'complete' } : r));
+                // Upload Test
+                setStatusMessage(`Uploading ${(server.maxUpload < INITIAL_UPLOAD_SIZE_BYTES ? server.maxUpload : INITIAL_DOWNLOAD_SIZE_BYTES) / 1024 / 1024}MB to ${server.name}...`);
+                try {
+                    finalUpload = await measureUpload(server.uploadUrl, (server.maxUpload < INITIAL_UPLOAD_SIZE_BYTES ? server.maxUpload : INITIAL_DOWNLOAD_SIZE_BYTES), (p) => setCurrentTestProgress(p));
+                    setTestResults(prev => prev.map((r, idx) => idx === i ? { ...r, upload: finalUpload } : r));
+                    
+                    if (parseFloat(finalUpload) > FAST_CONNECTION_THRESHOLD_UP_MBPS) {
+                        if (server.maxUpload > LARGE_UPLOAD_SIZE_BYTES) {
+                            setStatusMessage(`Uploading to ${LARGE_UPLOAD_SIZE_BYTES / 1024 / 1024}MB to ${server.name}...`);
+                            finalUploadLarge = await measureUpload(server.uploadUrl, LARGE_UPLOAD_SIZE_BYTES, (p) => setCurrentTestProgress(p));
+                            if (parseFloat(finalUploadLarge) > parseFloat(finalUpload) ) {
+                                setTestResults(prev => prev.map((r, idx) => idx === i ? { ...r, upload: finalUploadLarge } : r));
+                            }
+                        }
+                    }
+                    setTestResults(prev => prev.map((r, index) => index === i ? { ...r, status: 'complete' } : r));
+                } catch (error) {
+                    console.error(`Upload test failed for ${server.name}:`, error);
+                    setTestResults(prev => prev.map((r, idx) => idx === i ? { ...r, upload: 'error' } : r));
+                    setTestResults(prev => prev.map((r, index) => index === i ? { ...r, status: 'error' } : r))
+                }
             } catch (error) {
                 console.error(`Test failed for ${server.name}:`, error);
                 setTestResults(prev => prev.map((r, index) => index === i ? { ...r, status: 'error' } : r));
@@ -183,7 +244,7 @@ export default function App() {
                 setOverallProgress(((i + 1) / SERVERS.length) * 100);
                 setCurrentTestProgress(0);
             }
-        }
+        };
         setIsTesting(false);
         setStatusMessage('All tests complete!');
     };
@@ -242,9 +303,9 @@ export default function App() {
             <div className="w-full max-w-3xl mx-auto">
                 <header className="text-center mb-6 md:mb-8">
                     <h1 className="text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-sky-400 to-cyan-300 py-2">
-                        Multi-Server Speed Test
+                        Next.Js Deployment Speedtests
                     </h1>
-                    <p className="text-slate-400 mt-1 text-base md:text-lg">Test your connection speed against multiple global servers.</p>
+                    <p className="text-slate-400 mt-1 text-base md:text-lg">Test your connection to available free Next.js hosts.</p>
                 </header>
 
                 {/* Main Results Panel */}
