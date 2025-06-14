@@ -23,7 +23,6 @@ export default async function handler(req) {
         }
       }
       // console.log(`Upload API (Edge): Consumed ${receivedBytes} bytes.`);
-
       const headers = {
         'Content-Type': 'application/json',
         'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
