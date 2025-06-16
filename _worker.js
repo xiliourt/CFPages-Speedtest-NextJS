@@ -1,6 +1,6 @@
-import { handler as handlerPing } from './pages/api/ping.js';
-import { handler as handlerDownload } from './pages/api/download.js';
-import { handler as handlerUpload } from './pages/api/upload.js';
+import { default as handlerPing } from './pages/api/ping.js';
+import { default as handlerDownload } from './pages/api/download.js';
+import { default as handlerUpload } from './pages/api/upload.js';
 
 export default {
     async fetch(request) {
