@@ -2,6 +2,7 @@
 export const runtime = 'edge'; 
 export const config = { runtime: 'edge', };
 
+
 // Function to generate a chunk of random data as Uint8Array
 function generateRandomChunk(size) {
   // Create a buffer of the specified size.
