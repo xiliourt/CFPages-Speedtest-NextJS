@@ -1,6 +1,6 @@
 import { default as handlerPing } from './pages/api/ping.js';
 import { default as handlerDownload } from './pages/api/download.js';
-import './pages/api/upload.js' as index;
+const index = require('./pages/api/upload.js');
 
 export default {
     async fetch(request, env) {
