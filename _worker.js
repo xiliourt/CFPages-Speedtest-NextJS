@@ -1,10 +1,9 @@
 import { default as handlerPing } from './pages/api/ping.js';
 import { default as handlerDownload } from './pages/api/download.js';
 import { default as handlerUpload } from './pages/api/upload.js';
-import { default as handlerUpload } from './pages/index.js';
 
 export default {
-    async fetch(request) {
+    async fetch(request, env) {
         const url = new URL(request.url);
 
         // --- Custom API/Worker Routes based on /pages/api structure ---
