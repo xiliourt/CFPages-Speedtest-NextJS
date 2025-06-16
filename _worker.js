@@ -1,6 +1,6 @@
 import { default as handlerPing } from './pages/api/ping.js';
 import { default as handlerDownload } from './pages/api/download.js';
-import { default as handlerUpload } from './pages/api/upload.js';
+import './pages/api/upload.js' as index;
 
 export default {
     async fetch(request, env) {
@@ -25,7 +25,7 @@ export default {
 
       if (url.pathname.startsWith('/')) {
             // Delegate to the products handler
-            return handlerIndex(request);
+            return index;
         }
         // --- Serve Static Assets ---
         // If none of the custom routes match, try to serve a static asset.
