@@ -14,10 +14,7 @@
     "react-dom": "^18",
     "tailwindcss": "^3.4.3", 
     "postcss": "^8.4.38",
-    "autoprefixer": "10.4.21",
-    "@vercel/edge": "^0.3.4",
-    "@opennextjs/cloudflare": "1.2.1",
-    "wrangler": "4.20.0"
+    "autoprefixer": "10.4.21"
   },
   "devDependencies": {
     "eslint": "^8",
