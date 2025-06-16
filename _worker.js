@@ -1,7 +1,7 @@
 import { default as handlerPing } from './pages/api/ping.js';
 import { default as handlerDownload } from './pages/api/download.js';
-const index = require('./pages/api/upload.js');
-
+import { default as handlerUpload } from './pages/api/upload.js';
+        
 export default {
     async fetch(request, env) {
         const url = new URL(request.url);
@@ -22,11 +22,7 @@ export default {
             // Delegate to the products handler
             return handlerUpload(request);
         }
-
-      if (url.pathname.startsWith('/')) {
-            // Delegate to the products handler
-            return index;
-        }
+        
         // --- Serve Static Assets ---
         // If none of the custom routes match, try to serve a static asset.
         // This is crucial for your Pages project to display its HTML, CSS, etc.
@@ -34,7 +30,7 @@ export default {
             return await env.ASSETS.fetch(request);
         } catch (e) {
             // Fallback for missing static assets
-            return new Response('Not Found', { status: 404 });
+            return new Response('This serves as a backend only.', { status: 404 });
         }
     },
 };
