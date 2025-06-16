@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 
-// --- Icon Components ---
 const PlayIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
         <path fillRule="evenodd" d="M4.5 5.653c0-1.427 1.529-2.33 2.779-1.643l11.54 6.347c1.295.712 1.295 2.573 0 3.286L7.28 19.99c-1.25.687-2.779-.217-2.779-1.643V5.653Z" clipRule="evenodd" />
@@ -60,9 +59,11 @@ const PING_COUNT = 4;
 const PING_TIMEOUT_MS = 2000;
 const INITIAL_DOWNLOAD_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
 const LARGE_DOWNLOAD_SIZE_BYTES = 50 * 1024 * 1024; // 50MB
+const SUPER_DOWNLOAD_SIZE_BYTES = 100 * 1024 * 1024; // 50MB
 const INITIAL_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
 const LARGE_UPLOAD_SIZE_BYTES = 25 * 1024 * 1024; // 25MB
 const FAST_CONNECTION_THRESHOLD_MBPS = 50;
+const SUPER_CONNECTION_THRESHOLD_MBPS = 200;
 const FAST_CONNECTION_THRESHOLD_UP_MBPS = 10;
 
 // --- Main App Component ---
@@ -240,16 +241,35 @@ export default function App() {
                 await new Promise(res => setTimeout(res, 200));
 
                 // Download Test
+                /*
+                    Start with INITIAL_DOWNLOAD_SIZE_BYTES
+                    If above SUPER_CONNECTION_THRESHOLD_MBPS
+                        try SUPER_DOWNLOAD_SIZE_BYTES 
+                    Else if above FAST_CONNECTION_THRESHOLD_MBPS
+                        try LARGE_DOWNLOAD_SIZE_BYTES
+                        if above SUPER_CONNECTION_THRESHOLD_MBPS
+                            try SUPER_LARGE_DOWNLOAD_SIZE_BYTES
+                   
+                   Update with math.max() after each test
+                */
                 setStatusMessage(`Downloading ${INITIAL_DOWNLOAD_SIZE_BYTES / 1024 / 1024}MB from ${server.name}...`);
                 try {
                     finalDownload = await measureDownload(server.downloadUrl, INITIAL_DOWNLOAD_SIZE_BYTES, (p) => setCurrentTestProgress(p));
                     setTestResults(prev => prev.map((r, idx) => idx === originalIndex ? { ...r, download: finalDownload } : r));
                     
-                    if (parseFloat(finalDownload) > FAST_CONNECTION_THRESHOLD_MBPS) {
+                    if (parseFloat(finalDownload) > SUPER_CONNECTION_THRESHOLD_MBPS) {
+                        setStatusMessage(`Downloading ${SUPER_LARGE_DOWNLOAD_SIZE_BYTES / 1024 / 1024}MB from ${server.name}...`);
+                        const finalDownloadSuper = await measureDownload(server.downloadUrl, SUPER_DOWNLOAD_SIZE_BYTES, (p) => setCurrentTestProgress(p));
+                        setTestResults(prev => prev.map((r, idx) => idx === originalIndex ? { ...r, download: Math.max(parseFloat(finalDownloadSuper), parseFloat(finalDownload))} : r));
+                    } else if (parseFloat(finalDownload) > FAST_CONNECTION_THRESHOLD_MBPS) {
                         setStatusMessage(`Downloading ${LARGE_DOWNLOAD_SIZE_BYTES / 1024 / 1024}MB from ${server.name}...`);
                         const finalDownloadLarge = await measureDownload(server.downloadUrl, LARGE_DOWNLOAD_SIZE_BYTES, (p) => setCurrentTestProgress(p));
-                        if (parseFloat(finalDownloadLarge) > parseFloat(finalDownload)) {
-                            setTestResults(prev => prev.map((r, idx) => idx === originalIndex ? { ...r, download: finalDownloadLarge } : r));
+                        if (parseFloat(finalDownloadLarge) > SUPER_CONNECTION_THRESHOLD_MBPS) {
+                            setStatusMessage(`Downloading ${SUPER_LARGE_DOWNLOAD_SIZE_BYTES / 1024 / 1024}MB from ${server.name}...`);
+                            const finalDownloadSuper = await measureDownload(server.downloadUrl, SUPER_LARGE_DOWNLOAD_SIZE_BYTES, (p) => setCurrentTestProgress(p));
+                            setTestResults(prev => prev.map((r, idx) => idx === originalIndex ? { ...r, download: Math.max(parseFloat(finalDoqnloadSuper), parseFloat(finalDownloadLarge), parseFloat(finalDownload))} : r));
+                        } else {
+                            setTestResults(prev => prev.map((r, idx) => idx === originalIndex ? { ...r, download: Math.max(parseFloat(finalDownloadLarge), parseFloat(finalDownload))} : r));
                         }
                     }
                 } catch(error) {
